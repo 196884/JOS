@@ -65,8 +65,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
     {
         uint32_t* ref = (uint32_t*) ebp;
         cprintf( 
-            "ebp %08x  eip %08x  args %08x %08x %08x %08x\n",
-            //"ebp 0x%08x  eip 0x%08x  args 0x%08x 0x%08x 0x%08x 0x%08x\n",
+            "ebp 0x%08x  eip 0x%08x  args 0x%08x 0x%08x 0x%08x 0x%08x\n",
             ebp, ref[1], ref[2], ref[3], ref[4], ref[5]
         );
         struct Eipdebuginfo info;
