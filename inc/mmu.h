@@ -29,11 +29,13 @@
 // page number field of address
 #define PGNUM(la)	(((uintptr_t) (la)) >> PTXSHIFT)
 
+#define PGMASK 0x3FF
+
 // page directory index
-#define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & 0x3FF)
+#define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & PGMASK)
 
 // page table index
-#define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & 0x3FF)
+#define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & PGMASK)
 
 // offset in page
 #define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
