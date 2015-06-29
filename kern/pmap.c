@@ -161,8 +161,8 @@ mem_init(void)
 
 	check_page_free_list(1);
 	check_page_alloc();
-	panic("mem_init: This function is not finished\n");
 	check_page();
+	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -320,10 +320,8 @@ page_free(struct PageInfo *pp)
     page_free_list = pp;
 }
 
-//
 // Decrement the reference count on a page,
 // freeing it if there are no more refs.
-//
 void
 page_decref(struct PageInfo* pp)
 {
@@ -352,15 +350,31 @@ page_decref(struct PageInfo* pp)
 //
 // Hint 3: look at inc/mmu.h for useful macros that mainipulate page
 // table and page directory entries.
-//
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
+    if( !pgdir )
+        panic("pgdir_walk: no page directory table give");
+
+    pde_t * pgdir_entry = &pgdir[PDX(va)];
+    if( !( *pgdir_entry & PTE_P ) )
+    {
+        if( !create )
+            return NULL;
+
+        struct PageInfo * pp = page_alloc(ALLOC_ZERO);
+        if( !pp )
+            return NULL;
+
+        ++pp->pp_ref;
+        *pgdir_entry = page2pa(pp) | PTE_P | PTE_W | PTE_U; // permissive, see hint 2
+    }
+    
+    // At this point, PTE_ADDR(*pgdir_entry) is a physical address...
+    pte_t * pte = KADDR(PTE_ADDR(*pgdir_entry));
+    return &pte[PTX(va)];
 }
 
-//
 // Map [va, va+size) of virtual address space to physical [pa, pa+size)
 // in the page table rooted at pgdir.  Size is a multiple of PGSIZE, and
 // va and pa are both page-aligned.
@@ -374,10 +388,28 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	// Fill this function in
+    if( va & PGMASK )
+        panic("boot_map_region: va is not page aligned");
+
+    if( size & PGMASK )
+        panic("boot_map_region: size is not a multiple of the page size");
+
+    if( pa & PGMASK )
+        panic("boot_map_region: pa is not page aligned");
+
+    uintptr_t va_end = va + size;
+    if( va_end < va )
+        panic("boot_map_region: out of memory");
+
+    for(; va < va_end; va += PGSIZE, pa += PGSIZE)
+    {
+        pte_t * pte = pgdir_walk(pgdir, (void *) va, 1);
+        if( !pte )
+            panic("boot_map_region: out of memory");
+        *pte = pa | (PGMASK & (perm | PTE_P));
+    }
 }
 
-//
 // Map the physical page 'pp' at virtual address 'va'.
 // The permissions (the low 12 bits) of the page table entry
 // should be set to 'perm|PTE_P'.
@@ -401,15 +433,28 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 //
 // Hint: The TA solution is implemented using pgdir_walk, page_remove,
 // and page2pa.
-//
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
-	return 0;
+    if( !pp )
+        panic("page_insert: no valid page provided");
+
+    pte_t * pte = pgdir_walk(pgdir, va, 1);
+    if( !pte )
+        return -E_NO_MEM;
+
+    ++pp->pp_ref; // needs to happen here if that page was already mapped!
+    if( *pte & PTE_P )
+    {
+        page_remove(pgdir, va);
+        tlb_invalidate(pgdir, va);
+    }
+
+    *pte = page2pa(pp) | (PGMASK & (perm | PTE_P));
+
+    return 0;
 }
 
-//
 // Return the page mapped at virtual address 'va'.
 // If pte_store is not zero, then we store in it the address
 // of the pte for this page.  This is used by page_remove and
@@ -419,15 +464,19 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 // Return NULL if there is no page mapped at va.
 //
 // Hint: the TA solution uses pgdir_walk and pa2page.
-//
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+    pte_t * pte = pgdir_walk(pgdir, va, 0);
+    if( !pte )
+        return NULL;
+
+    if( pte_store )
+        *pte_store = pte;
+
+    return pa2page(PTE_ADDR(*pte));
 }
 
-//
 // Unmaps the physical page at virtual address 'va'.
 // If there is no physical page at that address, silently does nothing.
 //
@@ -441,17 +490,21 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 //
 // Hint: The TA solution is implemented using page_lookup,
 // 	tlb_invalidate, and page_decref.
-//
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+    pte_t * pte;
+    struct PageInfo * pp = page_lookup(pgdir, va, &pte);
+    if( !pp )
+        return;
+
+    page_decref(pp);
+    *pte = 0;
+    tlb_invalidate(pgdir, va);
 }
 
-//
 // Invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
-//
 void
 tlb_invalidate(pde_t *pgdir, void *va)
 {
@@ -465,9 +518,7 @@ tlb_invalidate(pde_t *pgdir, void *va)
 // Checking functions.
 // --------------------------------------------------------------
 
-//
 // Check that the pages on the page_free_list are reasonable.
-//
 static void
 check_page_free_list(bool only_low_memory)
 {
