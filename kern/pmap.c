@@ -162,7 +162,6 @@ mem_init(void)
 	check_page_free_list(1);
 	check_page_alloc();
 	check_page();
-	panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory
@@ -173,7 +172,7 @@ mem_init(void)
 	//    - the new image at UPAGES -- kernel R, user R
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
-	// Your code goes here:
+    boot_map_region(kern_pgdir, UPAGES, PTSIZE, PADDR(pages), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -185,7 +184,7 @@ mem_init(void)
 	//       the kernel overflows its stack, it will fault rather than
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
-	// Your code goes here:
+    boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE, PADDR(bootstack), PTE_W | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
@@ -194,7 +193,7 @@ mem_init(void)
 	// We might not have 2^32 - KERNBASE bytes of physical memory, but
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
-	// Your code goes here:
+    boot_map_region(kern_pgdir, KERNBASE, ~KERNBASE + 1, 0, PTE_W | PTE_P);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -209,6 +208,7 @@ mem_init(void)
 	lcr3(PADDR(kern_pgdir));
 
 	check_page_free_list(0);
+	//panic("mem_init: This function is not finished\n");
 
 	// entry.S set the really important flags in cr0 (including enabling
 	// paging).  Here we configure the rest of the flags that we care about.
@@ -397,11 +397,13 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
     if( pa & PGMASK )
         panic("boot_map_region: pa is not page aligned");
 
+    // We check for wrap-around:
     uintptr_t va_end = va + size;
-    if( va_end < va )
+    if( va_end && va_end < va )
         panic("boot_map_region: out of memory");
 
-    for(; va < va_end; va += PGSIZE, pa += PGSIZE)
+    // Note that we cannot use va < va_end, as there will be wraparound at some point!
+    for(; va != va_end; va += PGSIZE, pa += PGSIZE)
     {
         pte_t * pte = pgdir_walk(pgdir, (void *) va, 1);
         if( !pte )
@@ -653,14 +655,11 @@ check_page_alloc(void)
 	cprintf("check_page_alloc() succeeded!\n");
 }
 
-//
 // Checks that the kernel part of virtual address space
 // has been setup roughly correctly (by mem_init()).
 //
 // This function doesn't test every corner case,
 // but it is a pretty good sanity check.
-//
-
 static void
 check_kern_pgdir(void)
 {
@@ -674,11 +673,10 @@ check_kern_pgdir(void)
 	for (i = 0; i < n; i += PGSIZE)
 		assert(check_va2pa(pgdir, UPAGES + i) == PADDR(pages) + i);
 
-
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
 		assert(check_va2pa(pgdir, KERNBASE + i) == i);
-
+    
 	// check kernel stack
 	for (i = 0; i < KSTKSIZE; i += PGSIZE)
 		assert(check_va2pa(pgdir, KSTACKTOP - KSTKSIZE + i) == PADDR(bootstack) + i);
