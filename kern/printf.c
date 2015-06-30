@@ -35,3 +35,19 @@ cprintf(const char *fmt, ...)
 	return cnt;
 }
 
+int cprintf_sep(int * do_sep, const char * sep, char * fmt, ...)
+{
+    va_list ap;
+    int cnt = 0;
+
+    if( *do_sep )
+        cnt += cprintf(sep);
+
+    va_start(ap, fmt);
+    cnt += vcprintf(fmt, ap);
+    va_end(ap);
+
+    *do_sep = 1;
+    return cnt;
+}
+

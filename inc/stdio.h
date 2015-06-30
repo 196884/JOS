@@ -21,6 +21,7 @@ int	vsnprintf(char *str, int size, const char *fmt, va_list);
 // lib/printf.c
 int	cprintf(const char *fmt, ...);
 int	vcprintf(const char *fmt, va_list);
+int cprintf_sep(int * do_sep, const char * sep, char * fmt, ...);
 
 // lib/fprintf.c
 int	printf(const char *fmt, ...);

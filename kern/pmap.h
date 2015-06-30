@@ -76,7 +76,9 @@ static inline struct PageInfo*
 pa2page(physaddr_t pa)
 {
 	if (PGNUM(pa) >= npages)
+    {
 		panic("pa2page called with invalid pa");
+    }
 	return &pages[PGNUM(pa)];
 }
 
@@ -87,5 +89,9 @@ page2kva(struct PageInfo *pp)
 }
 
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create);
+
+// Utils to be used in kern/monitor.c
+struct PageInfo * kernel_page_lookup(uintptr_t va, pte_t ** pte);
+pte_t * page_table_entry(uintptr_t va);
 
 #endif /* !JOS_KERN_PMAP_H */
