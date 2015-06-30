@@ -29,16 +29,17 @@
 // page number field of address
 #define PGNUM(la)	(((uintptr_t) (la)) >> PTXSHIFT)
 
-#define PGMASK 0x3FF
+#define PTMASK 0x3FF
+#define PGMASK 0xFFF
 
 // page directory index
-#define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & PGMASK)
+#define PDX(la)		((((uintptr_t) (la)) >> PDXSHIFT) & PTMASK)
 
 // page table index
-#define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & PGMASK)
+#define PTX(la)		((((uintptr_t) (la)) >> PTXSHIFT) & PTMASK)
 
 // offset in page
-#define PGOFF(la)	(((uintptr_t) (la)) & 0xFFF)
+#define PGOFF(la)	(((uintptr_t) (la)) & PGMASK)
 
 // construct linear address from indexes and offset
 #define PGADDR(d, t, o)	((void*) ((d) << PDXSHIFT | (t) << PTXSHIFT | (o)))
@@ -75,7 +76,7 @@
 #define PTE_SYSCALL	(PTE_AVAIL | PTE_P | PTE_W | PTE_U)
 
 // Address in page table or page directory entry
-#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~0xFFF)
+#define PTE_ADDR(pte)	((physaddr_t) (pte) & ~PGMASK)
 
 // Control Register flags
 #define CR0_PE		0x00000001	// Protection Enable
