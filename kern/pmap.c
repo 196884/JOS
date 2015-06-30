@@ -208,7 +208,6 @@ mem_init(void)
 	lcr3(PADDR(kern_pgdir));
 
 	check_page_free_list(0);
-	//panic("mem_init: This function is not finished\n");
 
 	// entry.S set the really important flags in cr0 (including enabling
 	// paging).  Here we configure the rest of the flags that we care about.
@@ -283,8 +282,6 @@ page_init(void)
 // page_free can check for double-free bugs.
 //
 // Returns NULL if out of free memory.
-//
-// Hint: use page2kva and memset
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
@@ -383,8 +380,6 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 // This function is only intended to set up the ``static'' mappings
 // above UTOP. As such, it should *not* change the pp_ref field on the
 // mapped pages.
-//
-// Hint: the TA solution uses pgdir_walk
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
@@ -432,9 +427,6 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 // RETURNS:
 //   0 on success
 //   -E_NO_MEM, if page table couldn't be allocated
-//
-// Hint: The TA solution is implemented using pgdir_walk, page_remove,
-// and page2pa.
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
@@ -464,8 +456,6 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 // but should not be used by most callers.
 //
 // Return NULL if there is no page mapped at va.
-//
-// Hint: the TA solution uses pgdir_walk and pa2page.
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
@@ -489,9 +479,6 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 //     (if such a PTE exists)
 //   - The TLB must be invalidated if you remove an entry from
 //     the page table.
-//
-// Hint: The TA solution is implemented using page_lookup,
-// 	tlb_invalidate, and page_decref.
 void
 page_remove(pde_t *pgdir, void *va)
 {
@@ -915,4 +902,16 @@ check_page_installed_pgdir(void)
 	page_free(pp0);
 
 	cprintf("check_page_installed_pgdir() succeeded!\n");
+}
+
+struct PageInfo * kernel_page_lookup(uintptr_t va, pte_t ** pte)
+{
+    return page_lookup(kern_pgdir, (void *) va, pte);
+}
+
+// To be used in monitor
+pte_t * page_table_entry(uintptr_t va)
+{
+    pte_t * pte = pgdir_walk(kern_pgdir, (void *) va, 0);
+    return pte;
 }
