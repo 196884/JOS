@@ -519,7 +519,6 @@ tlb_invalidate(pde_t *pgdir, void *va)
 
 static uintptr_t user_mem_check_addr;
 
-//
 // Check that an environment is allowed to access the range of memory
 // [va, va+len) with permissions 'perm | PTE_P'.
 // Normally 'perm' will contain PTE_U at least, but this is not required.
@@ -536,22 +535,41 @@ static uintptr_t user_mem_check_addr;
 //
 // Returns 0 if the user program can access this range of addresses,
 // and -E_FAULT otherwise.
-//
 int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
-	// LAB 3: Your code here.
+    perm              |= PTE_P;
+    uintptr_t va_curr  = ROUNDDOWN((uintptr_t) va, PGSIZE);
+    uintptr_t va_end   = ROUNDUP(((uintptr_t) va) + len, PGSIZE);
+    for(; va_curr != va_end; va_curr += PGSIZE)
+    {
+        if( va_curr >= ULIM )
+        {
+            user_mem_check_addr = MAX(va_curr, (uintptr_t) va);
+            return -E_FAULT;
+        }
 
+        pte_t * pte = NULL;
+        if( !page_lookup(env->env_pgdir, (void *) va_curr, &pte) )
+        {
+            user_mem_check_addr = MAX(va_curr, (uintptr_t) va);
+            return -E_FAULT;
+        }
+
+        if( (*pte & perm ) != perm )
+        {
+            user_mem_check_addr = MAX(va_curr, (uintptr_t) va);
+            return -E_FAULT;
+        }
+    }
 	return 0;
 }
 
-//
 // Checks that environment 'env' is allowed to access the range
 // of memory [va, va+len) with permissions 'perm | PTE_U | PTE_P'.
 // If it can, then the function simply returns.
 // If it cannot, 'env' is destroyed and, if env is the current
 // environment, this function will not return.
-//
 void
 user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 {

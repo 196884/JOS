@@ -75,29 +75,31 @@ extern void th_pgflt();
 extern void th_fperr();
 extern void th_align();
 extern void th_mchk();
+extern void th_syscall();
 
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
  
-    SETGATE(idt[0],  0, GD_KT, th_divide, 0); // KT for Kernel Text
-    SETGATE(idt[1],  0, GD_KT, th_debug,  0);
-    SETGATE(idt[2],  0, GD_KT, th_nmi,    0);
-    SETGATE(idt[3],  0, GD_KT, th_brkpt,  0);
-    SETGATE(idt[4],  0, GD_KT, th_oflow,  0);
-    SETGATE(idt[5],  0, GD_KT, th_bound,  0);
-    SETGATE(idt[6],  0, GD_KT, th_illop,  0);
-    SETGATE(idt[7],  0, GD_KT, th_device, 0);
-    SETGATE(idt[8],  0, GD_KT, th_dblflt, 0);
-    SETGATE(idt[10], 0, GD_KT, th_tss,    0);
-    SETGATE(idt[11], 0, GD_KT, th_segnp,  0);
-    SETGATE(idt[12], 0, GD_KT, th_stack,  0);
-    SETGATE(idt[13], 0, GD_KT, th_gpflt,  0);
-    SETGATE(idt[14], 0, GD_KT, th_pgflt,  0);
-    SETGATE(idt[16], 0, GD_KT, th_fperr,  0);
-    SETGATE(idt[17], 0, GD_KT, th_align,  0);
-    SETGATE(idt[18], 0, GD_KT, th_mchk,   0);
+    SETGATE(idt[0],  0, GD_KT, th_divide,  0); // KT for Kernel Text
+    SETGATE(idt[1],  0, GD_KT, th_debug,   0);
+    SETGATE(idt[2],  0, GD_KT, th_nmi,     0);
+    SETGATE(idt[3],  0, GD_KT, th_brkpt,   3); // User code should be able to invoke 'int $3'
+    SETGATE(idt[4],  0, GD_KT, th_oflow,   0);
+    SETGATE(idt[5],  0, GD_KT, th_bound,   0);
+    SETGATE(idt[6],  0, GD_KT, th_illop,   0);
+    SETGATE(idt[7],  0, GD_KT, th_device,  0);
+    SETGATE(idt[8],  0, GD_KT, th_dblflt,  0);
+    SETGATE(idt[10], 0, GD_KT, th_tss,     0);
+    SETGATE(idt[11], 0, GD_KT, th_segnp,   0);
+    SETGATE(idt[12], 0, GD_KT, th_stack,   0);
+    SETGATE(idt[13], 0, GD_KT, th_gpflt,   0);
+    SETGATE(idt[14], 0, GD_KT, th_pgflt,   0);
+    SETGATE(idt[16], 0, GD_KT, th_fperr,   0);
+    SETGATE(idt[17], 0, GD_KT, th_align,   0);
+    SETGATE(idt[18], 0, GD_KT, th_mchk,    0);
+    SETGATE(idt[48], 0, GD_KT, th_syscall, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -174,6 +176,30 @@ print_regs(struct PushRegs *regs)
 static void
 trap_dispatch(struct Trapframe *tf)
 {
+    switch(tf->tf_trapno)
+    {
+    case T_PGFLT: 
+        page_fault_handler(tf);
+        return;
+    case T_BRKPT:
+        monitor(tf);
+        return;
+    case T_SYSCALL:
+        {
+            cprintf("trap_dispatch - before syscall\n");
+            int32_t res = syscall(
+                tf->tf_regs.reg_eax,
+                tf->tf_regs.reg_edx,
+                tf->tf_regs.reg_ecx,
+                tf->tf_regs.reg_ebx,
+                tf->tf_regs.reg_edi,
+                tf->tf_regs.reg_esi
+            );
+            cprintf("trap_dispatch - after syscall\n");
+            tf->tf_regs.reg_eax = res;
+        }
+        return;
+    }
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 
@@ -234,9 +260,9 @@ page_fault_handler(struct Trapframe *tf)
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
 
-	// Handle kernel-mode page faults.
-
-	// LAB 3: Your code here.
+	// Handle kernel-mode page faults (cf kern/env.c: the lower 2 bits maintain the RPL...
+    if( !(tf->tf_cs & 0x3) )
+        panic("page_fault_handler: error in kernel mode at va[0x%08x], ip[0x%08x]", fault_va, tf->tf_eip);
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
