@@ -58,13 +58,46 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
+extern void th_divide();
+extern void th_debug();
+extern void th_nmi();
+extern void th_brkpt();
+extern void th_oflow();
+extern void th_bound();
+extern void th_illop();
+extern void th_device();
+extern void th_dblflt();
+extern void th_tss();
+extern void th_segnp();
+extern void th_stack();
+extern void th_gpflt();
+extern void th_pgflt();
+extern void th_fperr();
+extern void th_align();
+extern void th_mchk();
 
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
-	// LAB 3: Your code here.
+ 
+    SETGATE(idt[0],  0, GD_KT, th_divide, 0); // KT for Kernel Text
+    SETGATE(idt[1],  0, GD_KT, th_debug,  0);
+    SETGATE(idt[2],  0, GD_KT, th_nmi,    0);
+    SETGATE(idt[3],  0, GD_KT, th_brkpt,  0);
+    SETGATE(idt[4],  0, GD_KT, th_oflow,  0);
+    SETGATE(idt[5],  0, GD_KT, th_bound,  0);
+    SETGATE(idt[6],  0, GD_KT, th_illop,  0);
+    SETGATE(idt[7],  0, GD_KT, th_device, 0);
+    SETGATE(idt[8],  0, GD_KT, th_dblflt, 0);
+    SETGATE(idt[10], 0, GD_KT, th_tss,    0);
+    SETGATE(idt[11], 0, GD_KT, th_segnp,  0);
+    SETGATE(idt[12], 0, GD_KT, th_stack,  0);
+    SETGATE(idt[13], 0, GD_KT, th_gpflt,  0);
+    SETGATE(idt[14], 0, GD_KT, th_pgflt,  0);
+    SETGATE(idt[16], 0, GD_KT, th_fperr,  0);
+    SETGATE(idt[17], 0, GD_KT, th_align,  0);
+    SETGATE(idt[18], 0, GD_KT, th_mchk,   0);
 
 	// Per-CPU setup 
 	trap_init_percpu();
